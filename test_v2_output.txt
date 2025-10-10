@@ -1,0 +1,48 @@
+[Testing version v2]
+
+버전 v2 포맷 미리보기:
+======================================================================
+[타이틀 메시지]
+금일의 뉴스! (2025년 10월 10일)
+
+----------------------------------------------------------------------
+
+[메시지 1]
+테스트 뉴스 제목
+
+
+[핵심 3줄]
+
+1. 무슨 일: 이것은 쉬운 설명입니다
+
+2. 내 투자는: 테스트용 내용입니다
+
+3. 주목할 점: 추가 분석 필요
+
+
+[쿠팡 파트너스 추천]
+테스트: 테스트 상품
+https://test.com
+
+
+테스트 준수문구
+======================================================================
+Traceback (most recent call last):
+  File "G:\내 드라이브\08.Programming\spread_insight\version_manager.py", line 138, in test_version
+    print(f"\u2705 버전 {version} 테스트 완료!")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'cp949' codec can't encode character '\u2705' in position 0: illegal multibyte sequence
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "G:\내 드라이브\08.Programming\spread_insight\version_manager.py", line 178, in <module>
+    main()
+    ~~~~^^
+  File "G:\내 드라이브\08.Programming\spread_insight\version_manager.py", line 172, in main
+    test_version(sys.argv[2])
+    ~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "G:\내 드라이브\08.Programming\spread_insight\version_manager.py", line 142, in test_version
+    print(f"\u274c 테스트 실패: {e}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'cp949' codec can't encode character '\u274c' in position 0: illegal multibyte sequence

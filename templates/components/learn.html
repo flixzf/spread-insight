@@ -1,0 +1,33 @@
+<section class="section learn-section">
+    <h2 class="section-title">
+        <span class="icon">[책]</span>
+        오늘의 용어
+    </h2>
+
+    {% for term, info in article.terminology.items() %}
+    <div class="term-card">
+        <div class="term-header">
+            <h3 class="term-name">{{ term }}</h3>
+            <span class="term-tier tier-{{ info.tier }}">Tier {{ info.tier }}</span>
+            <span class="term-category">{{ info.category }}</span>
+        </div>
+
+        <div class="term-body">
+            <div class="term-section">
+                <h4>[용어] 알아두면 좋은 용어</h4>
+                <p>{{ info.definition }}</p>
+            </div>
+
+            <div class="term-section">
+                <h4>[쉽게] 쉽게 말하면?</h4>
+                <p>{{ info.example }}</p>
+            </div>
+
+            <div class="term-section">
+                <h4>[중요] 왜 중요할까요?</h4>
+                <p>{{ info.why_important }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</section>

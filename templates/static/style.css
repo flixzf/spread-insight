@@ -1,0 +1,523 @@
+/* ================================================
+   Spread Insight - CSS Stylesheet
+   ================================================ */
+
+:root {
+    /* 색상 팔레트 */
+    --primary: #2c3e50;
+    --secondary: #34495e;
+    --accent: #3498db;
+    --learn: #f39c12;
+    --action: #27ae60;
+    --danger: #e74c3c;
+    --bg: #ecf0f1;
+    --bg-light: #ffffff;
+    --text: #2c3e50;
+    --text-muted: #7f8c8d;
+    --border: #bdc3c7;
+
+    /* 타이포그래피 */
+    --font-main: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    --line-height: 1.7;
+}
+
+/* ================================================
+   기본 설정
+   ================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-main);
+    color: var(--text);
+    background-color: var(--bg);
+    line-height: var(--line-height);
+    font-size: 16px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* ================================================
+   헤더 & 푸터
+   ================================================ */
+
+.site-header {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.logo {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.tagline {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.site-footer {
+    background-color: var(--primary);
+    color: white;
+    text-align: center;
+    padding: 30px 20px;
+    margin-top: 60px;
+}
+
+.site-footer p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+}
+
+.disclaimer {
+    opacity: 0.7;
+    font-size: 0.85rem !important;
+}
+
+/* ================================================
+   메인 컨텐츠
+   ================================================ */
+
+.main-content {
+    padding: 40px 0;
+}
+
+.news-article {
+    background-color: var(--bg-light);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* ================================================
+   섹션 공통
+   ================================================ */
+
+.section {
+    padding: 40px 30px;
+    border-bottom: 1px solid var(--border);
+}
+
+.section:last-child {
+    border-bottom: none;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.icon {
+    font-size: 1.3rem;
+}
+
+/* ================================================
+   1. 헤드라인
+   ================================================ */
+
+.header-section {
+    background: linear-gradient(to bottom, var(--bg), var(--bg-light));
+}
+
+.article-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 15px;
+}
+
+.article-title {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 20px;
+    color: var(--primary);
+}
+
+.keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.keyword-tag {
+    display: inline-block;
+    background-color: var(--accent);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* ================================================
+   2. What 섹션
+   ================================================ */
+
+.summary-box,
+.easy-box {
+    background-color: var(--bg);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.summary-box:last-child,
+.easy-box:last-child {
+    margin-bottom: 0;
+}
+
+.summary-box h3,
+.easy-box h3 {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.summary,
+.easy-explanation {
+    font-size: 1rem;
+    line-height: 1.8;
+}
+
+/* ================================================
+   3. Learn 섹션 (용어)
+   ================================================ */
+
+.learn-section {
+    background-color: #fffbf0;
+}
+
+.learn-section .section-title {
+    color: var(--learn);
+}
+
+.term-card {
+    background-color: white;
+    border: 2px solid var(--learn);
+    border-radius: 10px;
+    padding: 25px;
+}
+
+.term-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.term-name {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--learn);
+}
+
+.term-tier,
+.term-category {
+    font-size: 0.85rem;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.term-tier {
+    background-color: var(--learn);
+    color: white;
+}
+
+.tier-1 { background-color: #e74c3c; }
+.tier-2 { background-color: #f39c12; }
+.tier-3 { background-color: #95a5a6; }
+
+.term-category {
+    background-color: var(--bg);
+    color: var(--text);
+}
+
+.term-body {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.term-section h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--primary);
+}
+
+.term-section p {
+    line-height: 1.8;
+}
+
+/* ================================================
+   4. Past & Insight (Placeholder)
+   ================================================ */
+
+.placeholder {
+    background-color: #f9f9f9;
+}
+
+.placeholder-content {
+    text-align: center;
+    padding: 30px;
+}
+
+.placeholder-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.placeholder-desc {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+/* ================================================
+   6. Action 섹션
+   ================================================ */
+
+.action-section {
+    background-color: #f0fdf4;
+}
+
+.action-section .section-title {
+    color: var(--action);
+}
+
+.action-box {
+    background-color: white;
+    border: 2px solid var(--action);
+    border-radius: 10px;
+    padding: 25px;
+}
+
+.action-intro {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: var(--primary);
+}
+
+.action-checklist {
+    list-style: none;
+    margin-left: 0;
+}
+
+.action-checklist li {
+    padding: 12px 0;
+    padding-left: 30px;
+    position: relative;
+    border-bottom: 1px solid var(--bg);
+    font-size: 1rem;
+}
+
+.action-checklist li:last-child {
+    border-bottom: none;
+}
+
+.action-checklist li::before {
+    content: '[✓]';
+    position: absolute;
+    left: 0;
+    color: var(--action);
+    font-weight: 700;
+}
+
+.action-note {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: var(--bg);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+/* ================================================
+   7. More 섹션
+   ================================================ */
+
+.more-box {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.more-box h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--primary);
+}
+
+.original-link a {
+    display: inline-block;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 2px;
+    transition: all 0.2s;
+}
+
+.original-link a:hover {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.keyword-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.keyword-link {
+    display: inline-block;
+    background-color: var(--bg);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+}
+
+.keyword-link:hover {
+    background-color: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.coupang-section {
+    padding: 20px;
+    background-color: #fff9e6;
+    border-radius: 8px;
+    border: 1px solid #ffd700;
+}
+
+.books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.book-card {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s;
+}
+
+.book-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.book-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--primary);
+}
+
+.book-author {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.book-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 15px;
+    color: var(--text);
+}
+
+.coupang-button {
+    display: inline-block;
+    background-color: #ff6b00;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.coupang-button:hover {
+    background-color: #e65c00;
+    transform: translateX(2px);
+}
+
+.coupang-disclaimer {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* ================================================
+   반응형
+   ================================================ */
+
+@media (max-width: 768px) {
+    .article-title {
+        font-size: 1.5rem;
+    }
+
+    .section {
+        padding: 30px 20px;
+    }
+
+    .section-title {
+        font-size: 1.3rem;
+    }
+
+    .term-name {
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        font-size: 15px;
+    }
+
+    .logo {
+        font-size: 1.5rem;
+    }
+
+    .article-title {
+        font-size: 1.3rem;
+    }
+
+    .section {
+        padding: 25px 15px;
+    }
+}

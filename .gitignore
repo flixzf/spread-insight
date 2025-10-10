@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# 환경 변수 (절대 커밋하지 말 것!)
+.env
+.env.local
+.env.*.local
+
+# 데이터
+data/
+*.db
+*.json
+
+# 로그
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# GitHub Pages 빌드
+github_pages/
+
+# 차트 이미지
+*.png
+*.jpg

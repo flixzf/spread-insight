@@ -1,0 +1,14 @@
+<section class="section header-section">
+    <div class="article-meta">
+        <span class="source">{{ article.source }}</span>
+        <span class="date">{{ article.published_at }}</span>
+    </div>
+
+    <h1 class="article-title">{{ article.title }}</h1>
+
+    <div class="keywords">
+        {% for keyword in article.keywords %}
+        <span class="keyword-tag">{{ keyword }}</span>
+        {% endfor %}
+    </div>
+</section>

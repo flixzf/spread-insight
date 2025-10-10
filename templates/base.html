@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="오늘 하나, 제대로 배우는 경제 뉴스">
+    <title>{% block title %}Spread Insight{% endblock %}</title>
+    <link rel="stylesheet" href="static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <h1 class="logo">Spread Insight</h1>
+            <p class="tagline">오늘 하나, 제대로 배우는 경제 뉴스</p>
+        </div>
+    </header>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>&copy; 2025 Spread Insight. All rights reserved.</p>
+            <p class="disclaimer">본 콘텐츠는 정보 제공 목적이며, 투자 권유가 아닙니다.</p>
+        </div>
+    </footer>
+</body>
+</html>
