@@ -18,6 +18,26 @@ data/
 *.db
 *.json
 
+# 개발 문서 (로컬에만 보관)
+PHASE*.md
+PROJECT_PLAN.md
+PROGRESS.md
+CONTENT_STRATEGY.md
+DETAILED_STEPS.md
+START_HERE.md
+TELEGRAM_SETUP.md
+TROUBLESHOOTING.md
+VERSION_GUIDE.md
+Untitled*.txt
+
+# 테스트 파일
+test_*.py
+check_*.py
+generate_*.py
+
+# 출력 파일
+output/
+
 # 로그
 logs/
 *.log
