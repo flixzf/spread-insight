@@ -31,7 +31,7 @@ class NewsScheduler:
         self.selector = AINewsSelector()
         self.gemini = GeminiAnalyzer()
         self.coupang = CoupangPartners()
-        self.publisher = TelegramPublisher()
+        # publisher는 매번 새로 생성 (연결 풀 문제 방지)
         self.kst = pytz.timezone('Asia/Seoul')
 
     async def scrape_and_send(self):
@@ -95,9 +95,10 @@ class NewsScheduler:
                 'coupang_disclosure': disclosure
             }
 
-            # 6. 텔레그램 발송
+            # 6. 텔레그램 발송 (매번 새 인스턴스 생성)
             print("\n[Step 6] Sending to Telegram...")
-            success = await self.publisher.send_article_with_image(article_data)
+            publisher = TelegramPublisher()  # 연결 풀 문제 방지
+            success = await publisher.send_article_with_image(article_data)
 
             if success:
                 print(f"\n{'='*70}")
