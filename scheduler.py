@@ -115,7 +115,16 @@ class NewsScheduler:
 
     def run_job(self):
         """스케줄 작업 실행 (동기 래퍼)"""
-        asyncio.run(self.scrape_and_send())
+        try:
+            # 새로운 이벤트 루프 생성 (Pool timeout 방지)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.scrape_and_send())
+            loop.close()
+        except Exception as e:
+            print(f"[ERROR] Job execution failed: {e}")
+            import traceback
+            traceback.print_exc()
 
     def start(self):
         """스케줄러 시작"""
@@ -123,15 +132,16 @@ class NewsScheduler:
         print("News Scheduler Started")
         print(f"{'='*70}")
         print("Schedule:")
-        print("  - 09:00 KST (Morning news)")
-        print("  - 12:00 KST (Lunch news)")
-        print("  - 18:00 KST (Evening news)")
+        print("  - 09:00 KST (00:00 UTC) - Morning news")
+        print("  - 12:00 KST (03:00 UTC) - Lunch news")
+        print("  - 18:00 KST (09:00 UTC) - Evening news")
         print(f"{'='*70}\n")
 
-        # 한국시간 기준 스케줄 등록
-        schedule.every().day.at("09:00").do(self.run_job)
-        schedule.every().day.at("12:00").do(self.run_job)
-        schedule.every().day.at("18:00").do(self.run_job)
+        # UTC 시간으로 스케줄 등록 (Railway는 UTC 기준)
+        # KST = UTC + 9시간
+        schedule.every().day.at("00:00").do(self.run_job)  # 09:00 KST
+        schedule.every().day.at("03:00").do(self.run_job)  # 12:00 KST
+        schedule.every().day.at("09:00").do(self.run_job)  # 18:00 KST
 
         # 현재 시간 출력
         current_time = datetime.now(self.kst).strftime('%Y-%m-%d %H:%M:%S KST')
