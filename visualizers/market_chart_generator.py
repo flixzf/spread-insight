@@ -12,6 +12,16 @@ import platform
 from datetime import datetime, timedelta
 from typing import List, Tuple, Optional
 import yfinance as yf
+import requests
+from bs4 import BeautifulSoup
+
+# pykrx 추가 (한국거래소 공식 데이터)
+try:
+    from pykrx import stock
+    PYKRX_AVAILABLE = True
+except ImportError:
+    PYKRX_AVAILABLE = False
+    print("[WARNING] pykrx not available, falling back to yfinance")
 
 
 class MarketChartGenerator:
@@ -35,21 +45,34 @@ class MarketChartGenerator:
         """한글 폰트 설정 (OS별)"""
         system = platform.system()
 
-        if system == 'Windows':
-            font_path = 'C:/Windows/Fonts/malgun.ttf'
-        elif system == 'Linux':
-            font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
-        elif system == 'Darwin':  # macOS
-            font_path = '/System/Library/Fonts/AppleSDGothicNeo.ttc'
-        else:
-            font_path = None
+        # 가능한 한글 폰트 경로들 (우선순위순)
+        font_paths = []
 
-        if font_path and os.path.exists(font_path):
-            try:
-                font_prop = fm.FontProperties(fname=font_path)
-                plt.rcParams['font.family'] = font_prop.get_name()
-            except Exception:
-                pass
+        if system == 'Windows':
+            font_paths = ['C:/Windows/Fonts/malgun.ttf', 'C:/Windows/Fonts/gulim.ttf']
+        elif system == 'Linux':
+            font_paths = [
+                '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+                '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
+                '/usr/share/fonts/truetype/nanum-coding/NanumGothicCoding.ttf',
+                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+            ]
+        elif system == 'Darwin':  # macOS
+            font_paths = ['/System/Library/Fonts/AppleSDGothicNeo.ttc']
+
+        # 존재하는 첫 번째 폰트 사용
+        for font_path in font_paths:
+            if os.path.exists(font_path):
+                try:
+                    font_prop = fm.FontProperties(fname=font_path)
+                    plt.rcParams['font.family'] = font_prop.get_name()
+                    print(f"[Font] Using Korean font: {font_path}")
+                    break
+                except Exception as e:
+                    print(f"[WARNING] Failed to load font {font_path}: {e}")
+                    continue
+        else:
+            print("[WARNING] No Korean font found, using default font (Korean text may not display correctly)")
 
         # 마이너스 기호 깨짐 방지
         plt.rcParams['axes.unicode_minus'] = False
@@ -157,21 +180,43 @@ class MarketChartGenerator:
             생성된 차트 파일 경로
         """
         try:
-            # 코스피 데이터 가져오기
-            ticker = yf.Ticker("^KS11")
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days+2)
+            data = None
 
-            data = ticker.history(start=start_date, end=end_date)
+            # pykrx 우선 사용
+            if PYKRX_AVAILABLE:
+                try:
+                    today = datetime.now().strftime("%Y%m%d")
+                    start_date_str = (datetime.now() - timedelta(days=days+5)).strftime("%Y%m%d")
 
-            if data.empty:
-                raise ValueError("코스피 데이터를 가져올 수 없습니다.")
+                    # 코스피 지수 데이터 가져오기
+                    df = stock.get_index_ohlcv_by_date(start_date_str, today, "1001")  # 1001 = KOSPI
+
+                    if not df.empty and len(df) >= days:
+                        data = df.tail(days)
+                except Exception as pykrx_error:
+                    print(f"[WARNING] pykrx 코스피 차트 데이터 조회 실패, yfinance로 재시도: {pykrx_error}")
+
+            # yfinance fallback
+            if data is None or (hasattr(data, 'empty') and data.empty):
+                ticker = yf.Ticker("^KS11")
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=days+2)
+
+                data = ticker.history(start=start_date, end=end_date)
+
+                if data.empty:
+                    raise ValueError("코스피 데이터를 가져올 수 없습니다.")
 
             # 차트 생성
             fig, ax = plt.subplots(figsize=(10, 6))
 
-            dates = data.index[-days:]
-            prices = data['Close'].iloc[-days:]
+            # pykrx와 yfinance 컬럼명 차이 처리
+            if '종가' in data.columns:  # pykrx
+                dates = data.index
+                prices = data['종가']
+            else:  # yfinance
+                dates = data.index[-days:]
+                prices = data['Close'].iloc[-days:]
 
             # 라인 차트
             ax.plot(dates, prices, marker='o', linewidth=2, markersize=8, color='#2196F3')
@@ -261,12 +306,31 @@ class MarketChartGenerator:
                 ax1.set_xticklabels(date_labels_krw)
 
             # 2. 코스피 차트
-            ticker_kospi = yf.Ticker("^KS11")
-            data_kospi = ticker_kospi.history(start=start_date, end=end_date)
+            data_kospi = None
+
+            # pykrx 우선 사용
+            if PYKRX_AVAILABLE:
+                try:
+                    today = datetime.now().strftime("%Y%m%d")
+                    start_date_str = (datetime.now() - timedelta(days=days+5)).strftime("%Y%m%d")
+                    df = stock.get_index_ohlcv_by_date(start_date_str, today, "1001")
+                    if not df.empty and len(df) >= days:
+                        data_kospi = df.tail(days)
+                except:
+                    pass
+
+            # yfinance fallback
+            if data_kospi is None or (hasattr(data_kospi, 'empty') and data_kospi.empty):
+                ticker_kospi = yf.Ticker("^KS11")
+                data_kospi = ticker_kospi.history(start=start_date, end=end_date)
 
             if not data_kospi.empty:
-                dates_kospi = data_kospi.index[-days:]
-                prices_kospi = data_kospi['Close'].iloc[-days:]
+                if '종가' in data_kospi.columns:  # pykrx
+                    dates_kospi = data_kospi.index
+                    prices_kospi = data_kospi['종가']
+                else:  # yfinance
+                    dates_kospi = data_kospi.index[-days:]
+                    prices_kospi = data_kospi['Close'].iloc[-days:]
 
                 ax2.plot(dates_kospi, prices_kospi, marker='o', linewidth=2, color='#2196F3')
                 ax2.set_title('코스피 지수', fontsize=14, fontweight='bold')
