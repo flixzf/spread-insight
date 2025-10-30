@@ -1,0 +1,32 @@
+# Spread Insight - 초압축 플로우 (AI 프롬프트용)
+
+## 시스템: AI 경제뉴스 자동 큐레이션 → 텔레그램 (하루 9회)
+
+## 6단계 플로우 (40초)
+1. 네이버경제 30개 스크랩 (https://news.naver.com/section/101, 셀렉터:.sa_item)
+2. Gemini AI 선정 (프롬프트:"경제편집장, 영향력/시의성으로 1개 선택", 출력:번호)
+3. 선정기사 전체 스크랩 (셀렉터:#title_area,#dic_area)
+4. Gemini 3중분석: (a)3문장요약 (b)투자Q&A "무슨일?/투자영향?/주목포인트?" (c)키워드5개
+5. 쿠팡상품추천 (선택)
+6. 텔레그램 발송 (타이틀→3초대기→본문순차발송)
+
+## n8n 노드체인
+Cron → HTTP(네이버) → HTMLExtract → HTTP(Gemini선정) → Code(번호추출) → HTTP(기사) → HTMLExtract → HTTP(Gemini요약) → HTTP(Gemini설명) → HTTP(Gemini키워드) → Code(포맷) → Telegram(타이틀) → Wait(3s) → Loop[Telegram→Wait(3s)]
+
+## API
+Gemini: POST generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent
+Yahoo: GET query1.finance.yahoo.com/v8/finance/chart/^KS11
+Telegram: POST api.telegram.org/bot{TOKEN}/sendMessage
+
+## 스케줄(KST)
+09/12/18시:뉴스 | 10/15시:시장현황 | 11시:경제용어 | 14/20시:차트 | 16시:투자팁
+
+## 핵심프롬프트
+선정: "경제편집장. 30개중 영향력/시의성/실용성 높은 1개. 답변:'선정 번호:N' 형식"
+분석: "Q.무슨일? Q.투자영향? Q.주목점? 각 2-4문장. 구체숫자+과거사례+종목명 필수"
+
+## 환경변수
+GEMINI_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+## 기술스택
+Python | BeautifulSoup | Gemini-2.0-flash-lite | python-telegram-bot | yfinance | schedule

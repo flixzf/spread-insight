@@ -42,37 +42,60 @@ class MarketChartGenerator:
         plt.style.use('seaborn-v0_8-darkgrid')
 
     def _setup_korean_font(self):
-        """한글 폰트 설정 (OS별)"""
+        """한글 폰트 설정 (OS별 + 자동 감지)"""
         system = platform.system()
 
-        # 가능한 한글 폰트 경로들 (우선순위순)
-        font_paths = []
+        # 1. 시스템 폰트 매니저에서 한글 폰트 자동 검색
+        font_found = False
+        available_fonts = [f.name for f in fm.fontManager.ttflist]
 
-        if system == 'Windows':
-            font_paths = ['C:/Windows/Fonts/malgun.ttf', 'C:/Windows/Fonts/gulim.ttf']
-        elif system == 'Linux':
-            font_paths = [
-                '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
-                '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
-                '/usr/share/fonts/truetype/nanum-coding/NanumGothicCoding.ttf',
-                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
-            ]
-        elif system == 'Darwin':  # macOS
-            font_paths = ['/System/Library/Fonts/AppleSDGothicNeo.ttc']
+        # 한글 폰트 우선순위
+        korean_fonts = ['NanumGothic', 'NanumBarunGothic', 'NanumSquare', 'Nanum Gothic',
+                       'Malgun Gothic', 'AppleGothic', 'Apple SD Gothic Neo',
+                       'Noto Sans CJK KR', 'Noto Sans KR']
 
-        # 존재하는 첫 번째 폰트 사용
-        for font_path in font_paths:
-            if os.path.exists(font_path):
-                try:
-                    font_prop = fm.FontProperties(fname=font_path)
-                    plt.rcParams['font.family'] = font_prop.get_name()
-                    print(f"[Font] Using Korean font: {font_path}")
-                    break
-                except Exception as e:
-                    print(f"[WARNING] Failed to load font {font_path}: {e}")
-                    continue
-        else:
-            print("[WARNING] No Korean font found, using default font (Korean text may not display correctly)")
+        for font_name in korean_fonts:
+            if font_name in available_fonts:
+                plt.rcParams['font.family'] = font_name
+                print(f"[Font] Using Korean font from system: {font_name}")
+                font_found = True
+                break
+
+        # 2. 폰트 못 찾으면 경로에서 직접 로드
+        if not font_found:
+            font_paths = []
+
+            if system == 'Windows':
+                font_paths = ['C:/Windows/Fonts/malgun.ttf', 'C:/Windows/Fonts/gulim.ttf']
+            elif system == 'Linux':
+                font_paths = [
+                    '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+                    '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
+                    '/usr/share/fonts/truetype/nanum-coding/NanumGothicCoding.ttf',
+                    '/usr/share/fonts/truetype/nanum/NanumSquare.ttf',
+                    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+                    # Debian/Ubuntu fonts-nanum 패키지 경로
+                    '/usr/share/fonts/truetype/nanum/NanumMyeongjo.ttf',
+                ]
+            elif system == 'Darwin':  # macOS
+                font_paths = ['/System/Library/Fonts/AppleSDGothicNeo.ttc']
+
+            for font_path in font_paths:
+                if os.path.exists(font_path):
+                    try:
+                        font_prop = fm.FontProperties(fname=font_path)
+                        plt.rcParams['font.family'] = font_prop.get_name()
+                        print(f"[Font] Using Korean font: {font_path}")
+                        font_found = True
+                        break
+                    except Exception as e:
+                        print(f"[WARNING] Failed to load font {font_path}: {e}")
+                        continue
+
+        if not font_found:
+            print("[WARNING] No Korean font found, using default font")
+            print("[WARNING] Korean text will display as boxes. Install fonts-nanum package.")
+            # 한글이 없어도 차트는 생성되도록 계속 진행
 
         # 마이너스 기호 깨짐 방지
         plt.rcParams['axes.unicode_minus'] = False
@@ -274,6 +297,29 @@ class MarketChartGenerator:
             plt.close()
             raise
 
+    def _fetch_yfinance_data_with_retry(self, ticker_symbol: str, start_date, end_date, max_retries=3):
+        """yfinance 데이터 가져오기 (재시도 로직 포함)"""
+        import time
+
+        for attempt in range(max_retries):
+            try:
+                print(f"[yfinance] Fetching {ticker_symbol} (attempt {attempt + 1}/{max_retries})")
+                ticker = yf.Ticker(ticker_symbol)
+                data = ticker.history(start=start_date, end=end_date, timeout=10)
+
+                if not data.empty:
+                    print(f"[yfinance] {ticker_symbol} data fetched successfully")
+                    return data
+                else:
+                    print(f"[WARNING] {ticker_symbol} returned empty data")
+
+            except Exception as e:
+                print(f"[WARNING] {ticker_symbol} fetch failed (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)  # 2초 대기 후 재시도
+
+        return None
+
     def create_daily_summary_chart(self, save_path: Optional[str] = None) -> str:
         """
         일일 종합 차트 (환율 + 코스피)
@@ -285,25 +331,30 @@ class MarketChartGenerator:
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
             days = 5
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days+5)  # 여유분 추가
 
             # 1. 환율 차트
-            ticker_krw = yf.Ticker("KRW=X")
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days+2)
-            data_krw = ticker_krw.history(start=start_date, end=end_date)
+            data_krw = self._fetch_yfinance_data_with_retry("KRW=X", start_date, end_date)
 
-            if not data_krw.empty:
+            if data_krw is not None and not data_krw.empty and len(data_krw) >= 2:
                 dates_krw = data_krw.index[-days:]
                 prices_krw = data_krw['Close'].iloc[-days:]
 
                 ax1.plot(dates_krw, prices_krw, marker='o', linewidth=2, color='#4CAF50')
-                ax1.set_title('환율 (달러/원)', fontsize=14, fontweight='bold')
-                ax1.set_xlabel('날짜', fontsize=10)
+                ax1.set_title('Exchange Rate (USD/KRW)', fontsize=14, fontweight='bold')
+                ax1.set_xlabel('Date', fontsize=10)
                 ax1.grid(True, alpha=0.3)
 
                 date_labels_krw = [d.strftime('%m/%d') for d in dates_krw]
                 ax1.set_xticks(range(len(dates_krw)))
                 ax1.set_xticklabels(date_labels_krw)
+            else:
+                # 데이터 없을 때 메시지 표시
+                ax1.text(0.5, 0.5, 'Exchange Rate Data\nNot Available',
+                        ha='center', va='center', fontsize=14,
+                        transform=ax1.transAxes, color='gray')
+                ax1.set_title('Exchange Rate (USD/KRW)', fontsize=14, fontweight='bold')
 
             # 2. 코스피 차트
             data_kospi = None
@@ -316,15 +367,15 @@ class MarketChartGenerator:
                     df = stock.get_index_ohlcv_by_date(start_date_str, today, "1001")
                     if not df.empty and len(df) >= days:
                         data_kospi = df.tail(days)
-                except:
-                    pass
+                        print(f"[pykrx] KOSPI data fetched successfully")
+                except Exception as e:
+                    print(f"[WARNING] pykrx KOSPI fetch failed: {e}")
 
             # yfinance fallback
             if data_kospi is None or (hasattr(data_kospi, 'empty') and data_kospi.empty):
-                ticker_kospi = yf.Ticker("^KS11")
-                data_kospi = ticker_kospi.history(start=start_date, end=end_date)
+                data_kospi = self._fetch_yfinance_data_with_retry("^KS11", start_date, end_date)
 
-            if not data_kospi.empty:
+            if data_kospi is not None and not data_kospi.empty and len(data_kospi) >= 2:
                 if '종가' in data_kospi.columns:  # pykrx
                     dates_kospi = data_kospi.index
                     prices_kospi = data_kospi['종가']
@@ -333,15 +384,21 @@ class MarketChartGenerator:
                     prices_kospi = data_kospi['Close'].iloc[-days:]
 
                 ax2.plot(dates_kospi, prices_kospi, marker='o', linewidth=2, color='#2196F3')
-                ax2.set_title('코스피 지수', fontsize=14, fontweight='bold')
-                ax2.set_xlabel('날짜', fontsize=10)
+                ax2.set_title('KOSPI Index', fontsize=14, fontweight='bold')
+                ax2.set_xlabel('Date', fontsize=10)
                 ax2.grid(True, alpha=0.3)
 
                 date_labels_kospi = [d.strftime('%m/%d') for d in dates_kospi]
                 ax2.set_xticks(range(len(dates_kospi)))
                 ax2.set_xticklabels(date_labels_kospi)
+            else:
+                # 데이터 없을 때 메시지 표시
+                ax2.text(0.5, 0.5, 'KOSPI Data\nNot Available',
+                        ha='center', va='center', fontsize=14,
+                        transform=ax2.transAxes, color='gray')
+                ax2.set_title('KOSPI Index', fontsize=14, fontweight='bold')
 
-            plt.suptitle('📊 일일 시장 마감 요약', fontsize=16, fontweight='bold', y=1.02)
+            plt.suptitle('Daily Market Summary', fontsize=16, fontweight='bold', y=1.02)
             plt.tight_layout()
 
             # 저장
