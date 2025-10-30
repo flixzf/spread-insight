@@ -6,6 +6,7 @@
 """
 
 import os
+import platform
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from io import BytesIO
@@ -26,11 +27,41 @@ class NewsCardDesigner:
         # 카드 크기 (Instagram 정사각형)
         self.card_size = (1080, 1080)
 
-        # 폰트 설정 (Windows 기본 한글 폰트)
-        self.font_paths = {
-            'bold': 'C:/Windows/Fonts/malgunbd.ttf',  # 맑은 고딕 Bold
-            'regular': 'C:/Windows/Fonts/malgun.ttf'   # 맑은 고딕
-        }
+        # 폰트 설정 (OS별 자동 감지)
+        self.font_paths = self._get_font_paths()
+
+    def _get_font_paths(self) -> dict:
+        """
+        OS별 한글 폰트 경로 자동 감지
+
+        Returns:
+            폰트 경로 딕셔너리 {'bold': path, 'regular': path}
+        """
+        system = platform.system()
+
+        if system == 'Windows':
+            return {
+                'bold': 'C:/Windows/Fonts/malgunbd.ttf',
+                'regular': 'C:/Windows/Fonts/malgun.ttf'
+            }
+        elif system == 'Linux':
+            # Ubuntu/Debian 계열 (Railway 서버)
+            # Nanum 폰트는 대부분의 Linux에 기본 설치되어 있음
+            return {
+                'bold': '/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf',
+                'regular': '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+            }
+        elif system == 'Darwin':  # macOS
+            return {
+                'bold': '/System/Library/Fonts/AppleSDGothicNeo.ttc',
+                'regular': '/System/Library/Fonts/AppleSDGothicNeo.ttc'
+            }
+        else:
+            # 알 수 없는 OS - 빈 경로 반환 (기본 폰트 사용)
+            return {
+                'bold': '',
+                'regular': ''
+            }
 
     def get_background_image(self, keyword: str = "economy") -> Image.Image:
         """
@@ -123,13 +154,13 @@ class NewsCardDesigner:
         # 제목 폰트 (크고 굵게)
         try:
             title_font = ImageFont.truetype(self.font_paths['bold'], 72)
-        except:
+        except (IOError, OSError):
             title_font = ImageFont.load_default()
 
         # 키워드 폰트 (작고 가볍게)
         try:
             keyword_font = ImageFont.truetype(self.font_paths['regular'], 36)
-        except:
+        except (IOError, OSError):
             keyword_font = ImageFont.load_default()
 
         # 제목 그리기 (여러 줄 지원)
@@ -189,7 +220,7 @@ class NewsCardDesigner:
             title_font = ImageFont.truetype(self.font_paths['bold'], 56)
             content_font = ImageFont.truetype(self.font_paths['regular'], 36)
             number_font = ImageFont.truetype(self.font_paths['bold'], 32)
-        except:
+        except (IOError, OSError):
             title_font = ImageFont.load_default()
             content_font = ImageFont.load_default()
             number_font = ImageFont.load_default()

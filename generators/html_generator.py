@@ -68,7 +68,7 @@ class HTMLGenerator:
             try:
                 dt = datetime.fromisoformat(article_data['published_at'])
                 prepared['published_at'] = dt.strftime('%Y년 %m월 %d일 %H:%M')
-            except:
+            except (ValueError, TypeError):
                 prepared['published_at'] = article_data.get('published_at', '')
 
         # 2. 키워드 기본값

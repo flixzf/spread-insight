@@ -21,6 +21,8 @@ from analyzers.ai_news_selector import AINewsSelector
 from analyzers.gemini_analyzer import GeminiAnalyzer
 from publishers.coupang_partners import CoupangPartners
 from publishers.telegram_publisher import TelegramPublisher
+from publishers.market_status_publisher import MarketStatusPublisher
+from publishers.market_chart_publisher import MarketChartPublisher
 
 
 class NewsScheduler:
@@ -114,8 +116,66 @@ class NewsScheduler:
             import traceback
             traceback.print_exc()
 
+    async def send_market_status(self):
+        """시장 현황 전송 (10시, 15시)"""
+        try:
+            current_time = datetime.now(self.kst).strftime('%Y-%m-%d %H:%M:%S KST')
+            print(f"\n{'='*70}")
+            print(f"[{current_time}] Sending market status...")
+            print(f"{'='*70}\n")
+
+            # 시장 현황 발송
+            publisher = MarketStatusPublisher()
+            success = await publisher.send_market_status()
+
+            if success:
+                print(f"\n{'='*70}")
+                print("[SUCCESS] Market status sent!")
+                print(f"Time: {current_time}")
+                print(f"{'='*70}\n")
+            else:
+                print(f"\n[ERROR] Failed to send market status\n")
+
+        except Exception as e:
+            print(f"\n[ERROR] Market status job failed: {e}\n")
+            import traceback
+            traceback.print_exc()
+
+    async def send_market_chart(self, chart_type: str = "daily"):
+        """시장 차트 전송 (14시, 20시)"""
+        try:
+            current_time = datetime.now(self.kst).strftime('%Y-%m-%d %H:%M:%S KST')
+            print(f"\n{'='*70}")
+            print(f"[{current_time}] Sending market chart ({chart_type})...")
+            print(f"{'='*70}\n")
+
+            # 차트 발송
+            publisher = MarketChartPublisher()
+
+            if chart_type == "daily":
+                success = await publisher.send_daily_summary_chart()
+            elif chart_type == "exchange":
+                success = await publisher.send_exchange_chart()
+            elif chart_type == "kospi":
+                success = await publisher.send_kospi_chart()
+            else:
+                success = await publisher.send_daily_summary_chart()
+
+            if success:
+                print(f"\n{'='*70}")
+                print(f"[SUCCESS] Market chart ({chart_type}) sent!")
+                print(f"Time: {current_time}")
+                print(f"{'='*70}\n")
+            else:
+                print(f"\n[ERROR] Failed to send market chart\n")
+
+        except Exception as e:
+            print(f"\n[ERROR] Market chart job failed: {e}\n")
+            import traceback
+            traceback.print_exc()
+
     def run_job(self):
-        """스케줄 작업 실행 (동기 래퍼)"""
+        """스케줄 작업 실행 (동기 래퍼) - 뉴스 발송"""
         try:
             # 새로운 이벤트 루프 생성 (Pool timeout 방지)
             loop = asyncio.new_event_loop()
@@ -127,22 +187,62 @@ class NewsScheduler:
             import traceback
             traceback.print_exc()
 
+    def run_market_status_job(self):
+        """시장 현황 작업 실행 (동기 래퍼)"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.send_market_status())
+            loop.close()
+        except Exception as e:
+            print(f"[ERROR] Market status job execution failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def run_market_chart_job(self):
+        """시장 차트 작업 실행 (동기 래퍼)"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.send_market_chart("daily"))
+            loop.close()
+        except Exception as e:
+            print(f"[ERROR] Market chart job execution failed: {e}")
+            import traceback
+            traceback.print_exc()
+
     def start(self):
         """스케줄러 시작"""
         print(f"\n{'='*70}")
-        print("News Scheduler Started")
+        print("Spread Insight Scheduler Started")
         print(f"{'='*70}")
-        print("Schedule:")
+        print("📰 News Schedule:")
         print("  - 09:00 KST (00:00 UTC) - Morning news")
         print("  - 12:00 KST (03:00 UTC) - Lunch news")
         print("  - 18:00 KST (09:00 UTC) - Evening news")
+        print("\n📈 Market Status Schedule:")
+        print("  - 10:00 KST (01:00 UTC) - Market open status")
+        print("  - 15:00 KST (06:00 UTC) - Real-time indicators")
+        print("\n📊 Market Chart Schedule:")
+        print("  - 14:00 KST (05:00 UTC) - Morning market summary chart")
+        print("  - 20:00 KST (11:00 UTC) - Daily closing chart")
         print(f"{'='*70}\n")
 
         # UTC 시간으로 스케줄 등록 (Railway는 UTC 기준)
         # KST = UTC + 9시간
+
+        # 뉴스 스케줄
         schedule.every().day.at("00:00").do(self.run_job)  # 09:00 KST
         schedule.every().day.at("03:00").do(self.run_job)  # 12:00 KST
         schedule.every().day.at("09:00").do(self.run_job)  # 18:00 KST
+
+        # 시장 현황 스케줄
+        schedule.every().day.at("01:00").do(self.run_market_status_job)  # 10:00 KST
+        schedule.every().day.at("06:00").do(self.run_market_status_job)  # 15:00 KST
+
+        # 시장 차트 스케줄
+        schedule.every().day.at("05:00").do(self.run_market_chart_job)  # 14:00 KST
+        schedule.every().day.at("11:00").do(self.run_market_chart_job)  # 20:00 KST
 
         # 현재 시간 출력
         current_time = datetime.now(self.kst).strftime('%Y-%m-%d %H:%M:%S KST')

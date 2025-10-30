@@ -68,7 +68,7 @@ class NaverScraper(BaseScraper):
                     # ISO 포맷 시도
                     try:
                         published_at = datetime.fromisoformat(date_str)
-                    except:
+                    except (ValueError, TypeError):
                         published_at = datetime.now()  # 파싱 실패 시 현재 시간
             else:
                 published_at = datetime.now()
