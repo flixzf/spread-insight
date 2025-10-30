@@ -46,3 +46,9 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.5.0
+
+# Phase 2A: Market data and charts
+yfinance==0.2.38
+pykrx==1.0.46
+matplotlib==3.8.2
+mplfinance==0.12.10b0
