@@ -6,10 +6,18 @@
 """
 
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Optional
 import requests
 from bs4 import BeautifulSoup
+
+# pykrx 추가 (한국거래소 공식 데이터)
+try:
+    from pykrx import stock
+    PYKRX_AVAILABLE = True
+except ImportError:
+    PYKRX_AVAILABLE = False
+    print("[WARNING] pykrx not available, falling back to yfinance")
 
 
 class MarketDataScraper:
@@ -29,7 +37,34 @@ class MarketDataScraper:
             status: 'up', 'down', 'flat'
         """
         try:
-            # 코스피 티커: ^KS11 또는 ^KOSPI
+            # pykrx 우선 사용 (한국거래소 공식 데이터)
+            if PYKRX_AVAILABLE:
+                try:
+                    today = datetime.now().strftime("%Y%m%d")
+                    yesterday = (datetime.now() - timedelta(days=3)).strftime("%Y%m%d")
+
+                    # 코스피 지수 데이터 가져오기
+                    df = stock.get_index_ohlcv_by_date(yesterday, today, "1001")  # 1001 = KOSPI
+
+                    if not df.empty and len(df) >= 2:
+                        current_price = df['종가'].iloc[-1]
+                        previous_close = df['종가'].iloc[-2]
+
+                        change = current_price - previous_close
+                        change_percent = (change / previous_close) * 100 if previous_close else 0
+
+                        status = 'up' if change > 0 else 'down' if change < 0 else 'flat'
+
+                        return {
+                            'price': round(current_price, 2),
+                            'change': round(change, 2),
+                            'change_percent': round(change_percent, 2),
+                            'status': status
+                        }
+                except Exception as pykrx_error:
+                    print(f"[WARNING] pykrx KOSPI 조회 실패, yfinance로 재시도: {pykrx_error}")
+
+            # yfinance fallback
             ticker = yf.Ticker("^KS11")
             data = ticker.history(period="1d")
 
@@ -68,7 +103,37 @@ class MarketDataScraper:
             {'rate': float, 'change': float, 'status': str}
         """
         try:
-            # USD/KRW 티커
+            # 네이버 금융에서 환율 스크래핑 (더 안정적)
+            try:
+                url = "https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_USDKRW"
+                response = requests.get(url, headers=self.headers, timeout=10)
+                response.raise_for_status()
+
+                soup = BeautifulSoup(response.text, 'html.parser')
+
+                # 현재 환율
+                rate_elem = soup.select_one('.rate_value')
+                if rate_elem:
+                    current_rate = float(rate_elem.text.replace(',', ''))
+
+                    # 전일 대비
+                    change_elem = soup.select_one('.change_value')
+                    if change_elem:
+                        change = float(change_elem.text.replace(',', ''))
+                    else:
+                        change = 0
+
+                    status = 'up' if change > 0 else 'down' if change < 0 else 'flat'
+
+                    return {
+                        'rate': round(current_rate, 2),
+                        'change': round(change, 2),
+                        'status': status
+                    }
+            except Exception as naver_error:
+                print(f"[WARNING] 네이버 환율 조회 실패, yfinance로 재시도: {naver_error}")
+
+            # yfinance fallback
             ticker = yf.Ticker("KRW=X")
             data = ticker.history(period="1d")
 
