@@ -116,7 +116,7 @@ class AINewsSelector:
         except Exception as e:
             try:
                 print(f"[ERROR] AI 선정 실패: {e}")
-            except:
+            except (UnicodeEncodeError, UnicodeDecodeError):
                 print("[ERROR] AI 선정 실패")
             print("[FALLBACK] 첫 번째 뉴스를 반환합니다.")
             return metadata_list[0]['url']

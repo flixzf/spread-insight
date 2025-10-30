@@ -1,156 +1,157 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-시장 차트 퍼블리셔
-- 차트 생성 및 텔레그램 전송
+시장 차트 텔레그램 발송 모듈
 """
 
-import asyncio
-import os
-from datetime import datetime
-import pytz
 from visualizers.market_chart_generator import MarketChartGenerator
 from publishers.telegram_publisher import TelegramPublisher
+import asyncio
+import os
 
 
 class MarketChartPublisher:
-    """시장 차트를 생성하고 텔레그램으로 발송"""
+    """시장 차트를 텔레그램으로 발송"""
 
     def __init__(self):
         self.generator = MarketChartGenerator()
-        self.kst = pytz.timezone('Asia/Seoul')
 
-    async def send_morning_chart(self) -> bool:
+    async def send_exchange_chart(self, caption: str = "📊 이번 주 환율 흐름") -> bool:
         """
-        오전 시장 요약 차트 전송 (14:00 KST)
+        환율 차트 전송
+
+        Args:
+            caption: 차트 캡션
 
         Returns:
             성공 여부
         """
         try:
-            current_time = datetime.now(self.kst).strftime('%Y-%m-%d %H:%M:%S KST')
-            print(f"\n{'='*70}")
-            print(f"[{current_time}] Sending morning market chart...")
-            print(f"{'='*70}\n")
+            # 차트 생성
+            print("[Chart Publisher] 환율 차트 생성 중...")
+            chart_path = self.generator.create_weekly_exchange_chart(days=5)
 
-            # 1. 복합 차트 생성
-            print("[Step 1] Creating combined chart...")
-            chart_path = self.generator.create_combined_chart(days=7)
-
-            if not chart_path:
-                print("  [ERROR] Failed to create chart")
-                return False
-
-            print(f"  [OK] Chart created: {chart_path}")
-
-            # 2. 캡션 작성
-            caption = f"📊 오전 시장 요약\n\n"
-            caption += f"주간 흐름을 한눈에!\n"
-            caption += f"⏰ {datetime.now(self.kst).strftime('%Y년 %m월 %d일 %H:%M')}"
-
-            # 3. 텔레그램 전송
-            print("\n[Step 2] Sending chart to Telegram...")
+            # 텔레그램 전송
+            print("[Chart Publisher] 텔레그램 전송 중...")
             publisher = TelegramPublisher()
-            success = await publisher.send_photo(
-                photo_path=chart_path,
-                caption=caption
-            )
+            success = await publisher.send_photo(chart_path, caption=caption)
 
-            # 4. 임시 파일 삭제
-            try:
+            # 파일 정리
+            if os.path.exists(chart_path):
                 os.remove(chart_path)
-                print(f"  [INFO] Deleted temp file: {chart_path}")
-            except:
-                pass
 
             if success:
-                print(f"\n{'='*70}")
-                print("[SUCCESS] Morning chart sent to Telegram!")
-                print(f"Time: {current_time}")
-                print(f"{'='*70}\n")
-                return True
+                print("[Chart Publisher] ✅ 환율 차트 전송 완료")
             else:
-                print(f"\n[ERROR] Failed to send chart to Telegram\n")
-                return False
+                print("[Chart Publisher] ❌ 환율 차트 전송 실패")
+
+            return success
 
         except Exception as e:
-            print(f"\n[ERROR] Morning chart publishing failed: {e}\n")
+            print(f"[ERROR] 환율 차트 발송 실패: {e}")
             import traceback
             traceback.print_exc()
             return False
 
-    async def send_closing_chart(self) -> bool:
+    async def send_kospi_chart(self, caption: str = "📈 이번 주 코스피 지수") -> bool:
         """
-        일일 마감 차트 전송 (20:00 KST)
+        코스피 차트 전송
+
+        Args:
+            caption: 차트 캡션
 
         Returns:
             성공 여부
         """
         try:
-            current_time = datetime.now(self.kst).strftime('%Y-%m-%d %H:%M:%S KST')
-            print(f"\n{'='*70}")
-            print(f"[{current_time}] Sending closing market chart...")
-            print(f"{'='*70}\n")
+            # 차트 생성
+            print("[Chart Publisher] 코스피 차트 생성 중...")
+            chart_path = self.generator.create_kospi_chart(days=5)
 
-            # 1. 복합 차트 생성
-            print("[Step 1] Creating combined chart...")
-            chart_path = self.generator.create_combined_chart(days=7)
-
-            if not chart_path:
-                print("  [ERROR] Failed to create chart")
-                return False
-
-            print(f"  [OK] Chart created: {chart_path}")
-
-            # 2. 캡션 작성
-            caption = f"📊 장 마감 종합 차트\n\n"
-            caption += f"오늘 하루도 수고하셨습니다!\n"
-            caption += f"⏰ {datetime.now(self.kst).strftime('%Y년 %m월 %d일 %H:%M')}"
-
-            # 3. 텔레그램 전송
-            print("\n[Step 2] Sending chart to Telegram...")
+            # 텔레그램 전송
+            print("[Chart Publisher] 텔레그램 전송 중...")
             publisher = TelegramPublisher()
-            success = await publisher.send_photo(
-                photo_path=chart_path,
-                caption=caption
-            )
+            success = await publisher.send_photo(chart_path, caption=caption)
 
-            # 4. 임시 파일 삭제
-            try:
+            # 파일 정리
+            if os.path.exists(chart_path):
                 os.remove(chart_path)
-                print(f"  [INFO] Deleted temp file: {chart_path}")
-            except:
-                pass
-
-            # 5. 오래된 차트 정리
-            self.generator.cleanup_old_charts(max_age_hours=24)
 
             if success:
-                print(f"\n{'='*70}")
-                print("[SUCCESS] Closing chart sent to Telegram!")
-                print(f"Time: {current_time}")
-                print(f"{'='*70}\n")
-                return True
+                print("[Chart Publisher] ✅ 코스피 차트 전송 완료")
             else:
-                print(f"\n[ERROR] Failed to send chart to Telegram\n")
-                return False
+                print("[Chart Publisher] ❌ 코스피 차트 전송 실패")
+
+            return success
 
         except Exception as e:
-            print(f"\n[ERROR] Closing chart publishing failed: {e}\n")
+            print(f"[ERROR] 코스피 차트 발송 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    async def send_daily_summary_chart(self, caption: str = "📊 일일 시장 마감 요약") -> bool:
+        """
+        일일 종합 차트 전송
+
+        Args:
+            caption: 차트 캡션
+
+        Returns:
+            성공 여부
+        """
+        try:
+            # 차트 생성
+            print("[Chart Publisher] 일일 종합 차트 생성 중...")
+            chart_path = self.generator.create_daily_summary_chart()
+
+            # 텔레그램 전송
+            print("[Chart Publisher] 텔레그램 전송 중...")
+            publisher = TelegramPublisher()
+            success = await publisher.send_photo(chart_path, caption=caption)
+
+            # 파일 정리
+            if os.path.exists(chart_path):
+                os.remove(chart_path)
+
+            if success:
+                print("[Chart Publisher] ✅ 일일 종합 차트 전송 완료")
+            else:
+                print("[Chart Publisher] ❌ 일일 종합 차트 전송 실패")
+
+            return success
+
+        except Exception as e:
+            print(f"[ERROR] 일일 종합 차트 발송 실패: {e}")
             import traceback
             traceback.print_exc()
             return False
 
 
 async def main():
-    """테스트용 메인 함수"""
+    """테스트 실행"""
+    print("=" * 70)
+    print("Market Chart Publisher Test")
+    print("=" * 70)
+
     publisher = MarketChartPublisher()
 
-    print("Testing morning chart...")
-    await publisher.send_morning_chart()
+    # 환율 차트 전송 테스트
+    print("\n1. 환율 차트 전송 테스트...")
+    success1 = await publisher.send_exchange_chart()
 
-    print("\n\nTesting closing chart...")
-    await publisher.send_closing_chart()
+    # 코스피 차트 전송 테스트
+    print("\n2. 코스피 차트 전송 테스트...")
+    success2 = await publisher.send_kospi_chart()
+
+    # 일일 종합 차트 전송 테스트
+    print("\n3. 일일 종합 차트 전송 테스트...")
+    success3 = await publisher.send_daily_summary_chart()
+
+    print("\n" + "=" * 70)
+    if all([success1, success2, success3]):
+        print("✅ 모든 차트 전송 성공!")
+    else:
+        print("❌ 일부 차트 전송 실패")
 
 
 if __name__ == '__main__':

@@ -1,291 +1,332 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-시장 데이터 차트 생성기
-- matplotlib 기반 차트 생성
-- 텔레그램 전송용 이미지 생성
+시장 차트 생성기
+
+환율, 코스피 등의 주간/일간 차트를 생성하여 텔레그램으로 전송
 """
 
-import matplotlib
-matplotlib.use('Agg')  # GUI 없는 환경용
-
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from datetime import datetime
-from typing import Optional, Tuple
 import os
-from scrapers.market_data_scraper import MarketDataScraper
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+import platform
+from datetime import datetime, timedelta
+from typing import List, Tuple, Optional
+import yfinance as yf
 
 
 class MarketChartGenerator:
-    """시장 데이터 차트 생성"""
+    """시장 차트 생성"""
 
-    def __init__(self):
-        self.scraper = MarketDataScraper()
-        self.output_dir = "temp_charts"
+    def __init__(self, output_dir: str = "./data/charts"):
+        """
+        Args:
+            output_dir: 차트 이미지 저장 경로
+        """
+        self.output_dir = output_dir
+        os.makedirs(output_dir, exist_ok=True)
 
-        # 출력 디렉토리 생성
-        os.makedirs(self.output_dir, exist_ok=True)
+        # 한글 폰트 설정
+        self._setup_korean_font()
 
-        # 한글 폰트 설정 (fallback 처리)
-        self._setup_font()
+        # 차트 스타일 설정
+        plt.style.use('seaborn-v0_8-darkgrid')
 
-    def _setup_font(self):
-        """한글 폰트 설정 (Railway 환경 고려)"""
-        try:
-            # 시스템에 한글 폰트가 있으면 사용
-            plt.rcParams['font.family'] = 'DejaVu Sans'
-            plt.rcParams['axes.unicode_minus'] = False
-        except:
-            # 없으면 기본 폰트 사용 (영문으로 대체)
-            plt.rcParams['font.family'] = 'sans-serif'
-            plt.rcParams['axes.unicode_minus'] = False
+    def _setup_korean_font(self):
+        """한글 폰트 설정 (OS별)"""
+        system = platform.system()
 
-    def create_weekly_exchange_chart(self, days: int = 7) -> Optional[str]:
+        if system == 'Windows':
+            font_path = 'C:/Windows/Fonts/malgun.ttf'
+        elif system == 'Linux':
+            font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+        elif system == 'Darwin':  # macOS
+            font_path = '/System/Library/Fonts/AppleSDGothicNeo.ttc'
+        else:
+            font_path = None
+
+        if font_path and os.path.exists(font_path):
+            try:
+                font_prop = fm.FontProperties(fname=font_path)
+                plt.rcParams['font.family'] = font_prop.get_name()
+            except Exception:
+                pass
+
+        # 마이너스 기호 깨짐 방지
+        plt.rcParams['axes.unicode_minus'] = False
+
+    def create_weekly_exchange_chart(
+        self,
+        days: int = 5,
+        save_path: Optional[str] = None
+    ) -> str:
         """
         주간 환율 차트 생성
 
         Args:
-            days: 조회 기간 (일)
+            days: 표시할 일수 (기본 5일)
+            save_path: 저장 경로 (None이면 자동 생성)
 
         Returns:
             생성된 차트 파일 경로
         """
         try:
-            # 데이터 수집
-            data = self.scraper.get_historical_data('usdkrw', days=days)
-            if not data:
-                print("[ERROR] No historical data for USD/KRW")
-                return None
+            # 환율 데이터 가져오기
+            ticker = yf.Ticker("KRW=X")
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days+2)  # 여유분
+
+            data = ticker.history(start=start_date, end=end_date)
+
+            if data.empty:
+                raise ValueError("환율 데이터를 가져올 수 없습니다.")
 
             # 차트 생성
             fig, ax = plt.subplots(figsize=(10, 6))
 
-            dates = [datetime.strptime(d, '%Y-%m-%d') for d in data['dates']]
-            values = data['values']
+            dates = data.index[-days:]
+            prices = data['Close'].iloc[-days:]
 
-            ax.plot(dates, values, marker='o', linewidth=2, markersize=6, color='#2E86DE')
-            ax.fill_between(dates, values, alpha=0.3, color='#2E86DE')
+            # 라인 차트
+            ax.plot(dates, prices, marker='o', linewidth=2, markersize=8, color='#4CAF50')
+
+            # 데이터 레이블
+            for i, (date, price) in enumerate(zip(dates, prices)):
+                ax.annotate(
+                    f"{price:.1f}",
+                    xy=(date, price),
+                    xytext=(0, 10),
+                    textcoords='offset points',
+                    ha='center',
+                    fontsize=10,
+                    fontweight='bold'
+                )
 
             # 차트 스타일링
-            ax.set_title('USD/KRW Weekly Trend', fontsize=16, fontweight='bold', pad=20)
-            ax.set_xlabel('Date', fontsize=12)
-            ax.set_ylabel('KRW', fontsize=12)
-            ax.grid(True, alpha=0.3, linestyle='--')
+            ax.set_title('📊 이번 주 환율 흐름 (달러/원)', fontsize=16, fontweight='bold', pad=20)
+            ax.set_xlabel('날짜', fontsize=12)
+            ax.set_ylabel('환율 (원)', fontsize=12)
+            ax.grid(True, alpha=0.3)
 
-            # X축 날짜 포맷
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-            plt.xticks(rotation=45)
+            # 날짜 포맷
+            date_labels = [d.strftime('%m/%d') for d in dates]
+            ax.set_xticks(range(len(dates)))
+            ax.set_xticklabels(date_labels)
 
-            # 최신 값 표시
-            if len(values) > 0:
-                latest_value = values[-1]
-                ax.text(dates[-1], latest_value, f'{latest_value:,.0f}',
-                       ha='left', va='bottom', fontsize=10, fontweight='bold')
+            # 추세 표시
+            if len(prices) >= 2:
+                trend = "⬇ 하락 추세" if prices.iloc[-1] < prices.iloc[0] else "⬆ 상승 추세"
+                ax.text(
+                    0.5, 0.02, trend,
+                    transform=ax.transAxes,
+                    ha='center',
+                    fontsize=14,
+                    fontweight='bold',
+                    color='red' if '⬇' in trend else 'green'
+                )
 
             plt.tight_layout()
 
-            # 파일 저장
-            filepath = os.path.join(self.output_dir, f'usdkrw_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png')
-            plt.savefig(filepath, dpi=150, bbox_inches='tight')
+            # 저장
+            if not save_path:
+                save_path = os.path.join(self.output_dir, f"exchange_rate_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
             plt.close()
 
-            return filepath
+            print(f"[Chart] 환율 차트 생성 완료: {save_path}")
+            return save_path
 
         except Exception as e:
-            print(f"[ERROR] Failed to create USD/KRW chart: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
+            print(f"[ERROR] 환율 차트 생성 실패: {e}")
+            plt.close()
+            raise
 
-    def create_weekly_kospi_chart(self, days: int = 7) -> Optional[str]:
+    def create_kospi_chart(
+        self,
+        days: int = 5,
+        save_path: Optional[str] = None
+    ) -> str:
         """
         주간 코스피 차트 생성
 
         Args:
-            days: 조회 기간 (일)
+            days: 표시할 일수
+            save_path: 저장 경로
 
         Returns:
             생성된 차트 파일 경로
         """
         try:
-            # 데이터 수집
-            data = self.scraper.get_historical_data('kospi', days=days)
-            if not data:
-                print("[ERROR] No historical data for KOSPI")
-                return None
+            # 코스피 데이터 가져오기
+            ticker = yf.Ticker("^KS11")
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days+2)
+
+            data = ticker.history(start=start_date, end=end_date)
+
+            if data.empty:
+                raise ValueError("코스피 데이터를 가져올 수 없습니다.")
 
             # 차트 생성
             fig, ax = plt.subplots(figsize=(10, 6))
 
-            dates = [datetime.strptime(d, '%Y-%m-%d') for d in data['dates']]
-            values = data['values']
+            dates = data.index[-days:]
+            prices = data['Close'].iloc[-days:]
 
-            ax.plot(dates, values, marker='o', linewidth=2, markersize=6, color='#E74C3C')
-            ax.fill_between(dates, values, alpha=0.3, color='#E74C3C')
+            # 라인 차트
+            ax.plot(dates, prices, marker='o', linewidth=2, markersize=8, color='#2196F3')
+
+            # 데이터 레이블
+            for i, (date, price) in enumerate(zip(dates, prices)):
+                ax.annotate(
+                    f"{price:.0f}",
+                    xy=(date, price),
+                    xytext=(0, 10),
+                    textcoords='offset points',
+                    ha='center',
+                    fontsize=10,
+                    fontweight='bold'
+                )
 
             # 차트 스타일링
-            ax.set_title('KOSPI Weekly Trend', fontsize=16, fontweight='bold', pad=20)
-            ax.set_xlabel('Date', fontsize=12)
-            ax.set_ylabel('Index', fontsize=12)
-            ax.grid(True, alpha=0.3, linestyle='--')
+            ax.set_title('📈 이번 주 코스피 지수', fontsize=16, fontweight='bold', pad=20)
+            ax.set_xlabel('날짜', fontsize=12)
+            ax.set_ylabel('지수', fontsize=12)
+            ax.grid(True, alpha=0.3)
 
-            # X축 날짜 포맷
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-            plt.xticks(rotation=45)
+            # 날짜 포맷
+            date_labels = [d.strftime('%m/%d') for d in dates]
+            ax.set_xticks(range(len(dates)))
+            ax.set_xticklabels(date_labels)
 
-            # 최신 값 표시
-            if len(values) > 0:
-                latest_value = values[-1]
-                ax.text(dates[-1], latest_value, f'{latest_value:,.0f}',
-                       ha='left', va='bottom', fontsize=10, fontweight='bold')
+            # 추세 표시
+            if len(prices) >= 2:
+                change_pct = ((prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]) * 100
+                trend = f"⬇ 주간 {abs(change_pct):.2f}% 하락" if change_pct < 0 else f"⬆ 주간 {change_pct:.2f}% 상승"
+                ax.text(
+                    0.5, 0.02, trend,
+                    transform=ax.transAxes,
+                    ha='center',
+                    fontsize=14,
+                    fontweight='bold',
+                    color='red' if '⬇' in trend else 'green'
+                )
 
             plt.tight_layout()
 
-            # 파일 저장
-            filepath = os.path.join(self.output_dir, f'kospi_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png')
-            plt.savefig(filepath, dpi=150, bbox_inches='tight')
+            # 저장
+            if not save_path:
+                save_path = os.path.join(self.output_dir, f"kospi_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
             plt.close()
 
-            return filepath
+            print(f"[Chart] 코스피 차트 생성 완료: {save_path}")
+            return save_path
 
         except Exception as e:
-            print(f"[ERROR] Failed to create KOSPI chart: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
+            print(f"[ERROR] 코스피 차트 생성 실패: {e}")
+            plt.close()
+            raise
 
-    def create_combined_chart(self, days: int = 7) -> Optional[str]:
+    def create_daily_summary_chart(self, save_path: Optional[str] = None) -> str:
         """
-        환율 + 코스피 복합 차트 생성
-
-        Args:
-            days: 조회 기간 (일)
+        일일 종합 차트 (환율 + 코스피)
 
         Returns:
             생성된 차트 파일 경로
         """
         try:
-            # 데이터 수집
-            usdkrw_data = self.scraper.get_historical_data('usdkrw', days=days)
-            kospi_data = self.scraper.get_historical_data('kospi', days=days)
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-            if not usdkrw_data or not kospi_data:
-                print("[ERROR] Failed to get historical data")
-                return None
-
-            # 차트 생성 (2개의 서브플롯)
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
+            days = 5
 
             # 1. 환율 차트
-            dates1 = [datetime.strptime(d, '%Y-%m-%d') for d in usdkrw_data['dates']]
-            values1 = usdkrw_data['values']
+            ticker_krw = yf.Ticker("KRW=X")
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days+2)
+            data_krw = ticker_krw.history(start=start_date, end=end_date)
 
-            ax1.plot(dates1, values1, marker='o', linewidth=2, markersize=5, color='#2E86DE')
-            ax1.fill_between(dates1, values1, alpha=0.3, color='#2E86DE')
-            ax1.set_title('USD/KRW', fontsize=14, fontweight='bold')
-            ax1.set_ylabel('KRW', fontsize=11)
-            ax1.grid(True, alpha=0.3, linestyle='--')
-            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+            if not data_krw.empty:
+                dates_krw = data_krw.index[-days:]
+                prices_krw = data_krw['Close'].iloc[-days:]
 
-            # 최신 값 표시
-            if len(values1) > 0:
-                ax1.text(dates1[-1], values1[-1], f'{values1[-1]:,.0f}',
-                        ha='left', va='bottom', fontsize=9, fontweight='bold')
+                ax1.plot(dates_krw, prices_krw, marker='o', linewidth=2, color='#4CAF50')
+                ax1.set_title('환율 (달러/원)', fontsize=14, fontweight='bold')
+                ax1.set_xlabel('날짜', fontsize=10)
+                ax1.grid(True, alpha=0.3)
+
+                date_labels_krw = [d.strftime('%m/%d') for d in dates_krw]
+                ax1.set_xticks(range(len(dates_krw)))
+                ax1.set_xticklabels(date_labels_krw)
 
             # 2. 코스피 차트
-            dates2 = [datetime.strptime(d, '%Y-%m-%d') for d in kospi_data['dates']]
-            values2 = kospi_data['values']
+            ticker_kospi = yf.Ticker("^KS11")
+            data_kospi = ticker_kospi.history(start=start_date, end=end_date)
 
-            ax2.plot(dates2, values2, marker='o', linewidth=2, markersize=5, color='#E74C3C')
-            ax2.fill_between(dates2, values2, alpha=0.3, color='#E74C3C')
-            ax2.set_title('KOSPI', fontsize=14, fontweight='bold')
-            ax2.set_xlabel('Date', fontsize=11)
-            ax2.set_ylabel('Index', fontsize=11)
-            ax2.grid(True, alpha=0.3, linestyle='--')
-            ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-            plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
+            if not data_kospi.empty:
+                dates_kospi = data_kospi.index[-days:]
+                prices_kospi = data_kospi['Close'].iloc[-days:]
 
-            # 최신 값 표시
-            if len(values2) > 0:
-                ax2.text(dates2[-1], values2[-1], f'{values2[-1]:,.0f}',
-                        ha='left', va='bottom', fontsize=9, fontweight='bold')
+                ax2.plot(dates_kospi, prices_kospi, marker='o', linewidth=2, color='#2196F3')
+                ax2.set_title('코스피 지수', fontsize=14, fontweight='bold')
+                ax2.set_xlabel('날짜', fontsize=10)
+                ax2.grid(True, alpha=0.3)
 
-            # 전체 제목
-            fig.suptitle(f'Market Summary ({datetime.now().strftime("%Y-%m-%d")})',
-                        fontsize=16, fontweight='bold', y=0.995)
+                date_labels_kospi = [d.strftime('%m/%d') for d in dates_kospi]
+                ax2.set_xticks(range(len(dates_kospi)))
+                ax2.set_xticklabels(date_labels_kospi)
 
+            plt.suptitle('📊 일일 시장 마감 요약', fontsize=16, fontweight='bold', y=1.02)
             plt.tight_layout()
 
-            # 파일 저장
-            filepath = os.path.join(self.output_dir, f'combined_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png')
-            plt.savefig(filepath, dpi=150, bbox_inches='tight')
+            # 저장
+            if not save_path:
+                save_path = os.path.join(self.output_dir, f"daily_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
             plt.close()
 
-            return filepath
+            print(f"[Chart] 일일 종합 차트 생성 완료: {save_path}")
+            return save_path
 
         except Exception as e:
-            print(f"[ERROR] Failed to create combined chart: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
-
-    def cleanup_old_charts(self, max_age_hours: int = 24):
-        """
-        오래된 차트 파일 삭제
-
-        Args:
-            max_age_hours: 보관 기간 (시간)
-        """
-        try:
-            import time
-            now = time.time()
-            cutoff = now - (max_age_hours * 3600)
-
-            for filename in os.listdir(self.output_dir):
-                filepath = os.path.join(self.output_dir, filename)
-                if os.path.isfile(filepath):
-                    if os.path.getmtime(filepath) < cutoff:
-                        os.remove(filepath)
-                        print(f"[INFO] Deleted old chart: {filename}")
-
-        except Exception as e:
-            print(f"[ERROR] Failed to cleanup old charts: {e}")
+            print(f"[ERROR] 일일 종합 차트 생성 실패: {e}")
+            plt.close()
+            raise
 
 
 def main():
-    """테스트용 메인 함수"""
-    generator = MarketChartGenerator()
-
+    """테스트 실행"""
     print("=" * 70)
     print("Market Chart Generator Test")
     print("=" * 70)
 
-    # 1. 환율 차트
-    print("\n[1] Creating USD/KRW chart...")
-    usdkrw_chart = generator.create_weekly_exchange_chart()
-    if usdkrw_chart:
-        print(f"  [OK] Saved to: {usdkrw_chart}")
-    else:
-        print("  [FAIL] Failed to create chart")
+    generator = MarketChartGenerator()
 
-    # 2. 코스피 차트
-    print("\n[2] Creating KOSPI chart...")
-    kospi_chart = generator.create_weekly_kospi_chart()
-    if kospi_chart:
-        print(f"  [OK] Saved to: {kospi_chart}")
-    else:
-        print("  [FAIL] Failed to create chart")
+    try:
+        # 1. 환율 차트
+        print("\n1. 환율 차트 생성 중...")
+        exchange_chart = generator.create_weekly_exchange_chart(days=5)
+        print(f"✅ 생성 완료: {exchange_chart}")
 
-    # 3. 복합 차트
-    print("\n[3] Creating combined chart...")
-    combined_chart = generator.create_combined_chart()
-    if combined_chart:
-        print(f"  [OK] Saved to: {combined_chart}")
-    else:
-        print("  [FAIL] Failed to create chart")
+        # 2. 코스피 차트
+        print("\n2. 코스피 차트 생성 중...")
+        kospi_chart = generator.create_kospi_chart(days=5)
+        print(f"✅ 생성 완료: {kospi_chart}")
 
-    print("\n" + "=" * 70)
+        # 3. 일일 종합
+        print("\n3. 일일 종합 차트 생성 중...")
+        summary_chart = generator.create_daily_summary_chart()
+        print(f"✅ 생성 완료: {summary_chart}")
+
+        print("\n" + "=" * 70)
+        print("✅ 모든 차트 생성 완료!")
+
+    except Exception as e:
+        print(f"\n❌ 차트 생성 실패: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == '__main__':

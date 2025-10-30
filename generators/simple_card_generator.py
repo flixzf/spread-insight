@@ -7,6 +7,7 @@
 """
 
 import os
+import platform
 import requests
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
@@ -29,16 +30,45 @@ class SimpleCardGenerator:
         # 카드 크기 (Instagram 정사각형)
         self.card_size = (1080, 1080)
 
-        # 폰트 설정
-        self.font_paths = {
-            'bold': 'C:/Windows/Fonts/malgunbd.ttf',
-            'regular': 'C:/Windows/Fonts/malgun.ttf'
-        }
+        # 폰트 설정 (OS별 자동 감지)
+        self.font_paths = self._get_font_paths()
 
         # OpenAI 클라이언트
         self.openai_client = None
         if Config.OPENAI_API_KEY:
             self.openai_client = OpenAI(api_key=Config.OPENAI_API_KEY)
+
+    def _get_font_paths(self) -> dict:
+        """
+        OS별 한글 폰트 경로 자동 감지
+
+        Returns:
+            폰트 경로 딕셔너리 {'bold': path, 'regular': path}
+        """
+        system = platform.system()
+
+        if system == 'Windows':
+            return {
+                'bold': 'C:/Windows/Fonts/malgunbd.ttf',
+                'regular': 'C:/Windows/Fonts/malgun.ttf'
+            }
+        elif system == 'Linux':
+            # Ubuntu/Debian 계열 (Railway 서버)
+            return {
+                'bold': '/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf',
+                'regular': '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+            }
+        elif system == 'Darwin':  # macOS
+            return {
+                'bold': '/System/Library/Fonts/AppleSDGothicNeo.ttc',
+                'regular': '/System/Library/Fonts/AppleSDGothicNeo.ttc'
+            }
+        else:
+            # 알 수 없는 OS - 빈 경로 반환 (기본 폰트 사용)
+            return {
+                'bold': '',
+                'regular': ''
+            }
 
     def _generate_dalle_background(self, title: str, keywords: List[str]) -> Image.Image:
         """
@@ -139,7 +169,7 @@ Important: NO TEXT or LETTERS visible anywhere in the image."""
         try:
             title_font = ImageFont.truetype(self.font_paths['bold'], 60)
             keyword_font = ImageFont.truetype(self.font_paths['regular'], 32)
-        except:
+        except (IOError, OSError):
             title_font = ImageFont.load_default()
             keyword_font = ImageFont.load_default()
 

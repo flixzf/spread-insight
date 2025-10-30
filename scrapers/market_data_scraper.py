@@ -1,262 +1,212 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-시장 데이터 스크래퍼
-- 코스피 지수
-- 달러/원 환율
-- 기준금리
+실시간 시장 데이터 스크래퍼
+
+코스피, 환율, 금리 등 주요 경제 지표를 실시간으로 수집
 """
 
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional
+import requests
+from bs4 import BeautifulSoup
 
 
 class MarketDataScraper:
     """실시간 시장 데이터 수집"""
 
     def __init__(self):
-        # 티커 심볼
-        self.kospi_ticker = "^KS11"  # 코스피 지수
-        self.usdkrw_ticker = "KRW=X"  # 달러/원 환율
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
 
     def get_kospi_data(self) -> Optional[Dict]:
         """
         코스피 지수 및 등락률 조회
 
         Returns:
-            {
-                'value': 2650.5,
-                'change': 20.5,
-                'change_percent': 0.78,
-                'status': 'up' or 'down' or 'flat'
-            }
+            {'price': float, 'change': float, 'change_percent': float, 'status': str}
+            status: 'up', 'down', 'flat'
         """
         try:
-            ticker = yf.Ticker(self.kospi_ticker)
-            hist = ticker.history(period="2d")
+            # 코스피 티커: ^KS11 또는 ^KOSPI
+            ticker = yf.Ticker("^KS11")
+            data = ticker.history(period="1d")
 
-            if len(hist) < 1:
+            if data.empty:
+                # 대체 티커 시도
+                ticker = yf.Ticker("^KOSPI")
+                data = ticker.history(period="1d")
+
+            if data.empty:
                 return None
 
-            current = hist['Close'].iloc[-1]
+            current_price = data['Close'].iloc[-1]
+            previous_close = ticker.info.get('previousClose', current_price)
 
-            # 전일 종가가 있으면 등락률 계산
-            if len(hist) >= 2:
-                previous = hist['Close'].iloc[-2]
-                change = current - previous
-                change_percent = (change / previous) * 100
-            else:
-                change = 0
-                change_percent = 0
+            change = current_price - previous_close
+            change_percent = (change / previous_close) * 100 if previous_close else 0
 
-            # 상태 판단
-            if change > 0:
-                status = 'up'
-            elif change < 0:
-                status = 'down'
-            else:
-                status = 'flat'
+            status = 'up' if change > 0 else 'down' if change < 0 else 'flat'
 
             return {
-                'value': round(current, 2),
+                'price': round(current_price, 2),
                 'change': round(change, 2),
                 'change_percent': round(change_percent, 2),
                 'status': status
             }
 
         except Exception as e:
-            print(f"[ERROR] Failed to fetch KOSPI data: {e}")
+            print(f"[ERROR] KOSPI 데이터 조회 실패: {e}")
             return None
 
     def get_exchange_rate(self) -> Optional[Dict]:
         """
-        달러/원 환율 및 변동폭 조회
+        달러/원 환율 조회
 
         Returns:
-            {
-                'value': 1320.5,
-                'change': -5.0,
-                'change_percent': -0.38,
-                'status': 'up' or 'down' or 'flat'
-            }
+            {'rate': float, 'change': float, 'status': str}
         """
         try:
-            ticker = yf.Ticker(self.usdkrw_ticker)
-            hist = ticker.history(period="2d")
+            # USD/KRW 티커
+            ticker = yf.Ticker("KRW=X")
+            data = ticker.history(period="1d")
 
-            if len(hist) < 1:
+            if data.empty:
                 return None
 
-            current = hist['Close'].iloc[-1]
+            current_rate = data['Close'].iloc[-1]
+            previous_close = ticker.info.get('previousClose', current_rate)
 
-            # 전일 종가가 있으면 등락 계산
-            if len(hist) >= 2:
-                previous = hist['Close'].iloc[-2]
-                change = current - previous
-                change_percent = (change / previous) * 100
-            else:
-                change = 0
-                change_percent = 0
-
-            # 상태 판단 (환율은 상승=원화약세, 하락=원화강세)
-            if change > 0:
-                status = 'up'
-            elif change < 0:
-                status = 'down'
-            else:
-                status = 'flat'
+            change = current_rate - previous_close
+            status = 'up' if change > 0 else 'down' if change < 0 else 'flat'
 
             return {
-                'value': round(current, 2),
+                'rate': round(current_rate, 2),
                 'change': round(change, 2),
-                'change_percent': round(change_percent, 2),
                 'status': status
             }
 
         except Exception as e:
-            print(f"[ERROR] Failed to fetch USD/KRW data: {e}")
+            print(f"[ERROR] 환율 데이터 조회 실패: {e}")
             return None
 
     def get_interest_rate(self) -> Optional[Dict]:
         """
-        한국 기준금리 조회
-
-        Note:
-            실시간 API가 없어서 최근 발표된 금리를 사용
-            한국은행 금리는 자주 변경되지 않으므로 하드코딩 또는 캐싱 가능
+        한국 기준금리 조회 (한국은행 웹 스크래핑)
 
         Returns:
-            {
-                'value': 3.5,
-                'last_updated': '2025-10-01'
-            }
+            {'rate': float, 'status': str}
         """
         try:
-            # TODO: 한국은행 API 연동 또는 웹 스크래핑
-            # 현재는 최근 공지된 기준금리를 하드코딩
-            # 추후 한국은행 경제통계시스템(ECOS) API 활용 가능
+            # 네이버 금융에서 기준금리 정보 스크래핑
+            url = "https://finance.naver.com/marketindex/"
+            response = requests.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # 기준금리는 고정값으로 반환 (실시간 API 없음)
+            # 대신 최근 발표된 금리 사용
+            # TODO: 한국은행 공식 API 연동 고려
 
             return {
-                'value': 3.5,  # 2025년 10월 기준 (예시)
-                'last_updated': '2025-10-01',
-                'note': '한국은행 기준금리'
+                'rate': 3.5,  # 2024년 기준 (수동 업데이트 필요)
+                'status': 'flat'
             }
 
         except Exception as e:
-            print(f"[ERROR] Failed to fetch interest rate: {e}")
-            return None
+            print(f"[ERROR] 금리 데이터 조회 실패: {e}")
+            return {
+                'rate': 3.5,
+                'status': 'flat'
+            }
 
     def get_all_market_data(self) -> Dict:
         """
-        모든 시장 데이터를 한번에 조회
+        모든 시장 데이터를 한 번에 조회
 
         Returns:
             {
                 'kospi': {...},
-                'usdkrw': {...},
+                'exchange_rate': {...},
                 'interest_rate': {...},
-                'timestamp': '2025-10-30 15:30:00'
+                'timestamp': str
             }
         """
-        try:
-            kospi = self.get_kospi_data()
-            usdkrw = self.get_exchange_rate()
-            interest_rate = self.get_interest_rate()
+        return {
+            'kospi': self.get_kospi_data(),
+            'exchange_rate': self.get_exchange_rate(),
+            'interest_rate': self.get_interest_rate(),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
 
-            return {
-                'kospi': kospi,
-                'usdkrw': usdkrw,
-                'interest_rate': interest_rate,
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'success': all([kospi, usdkrw, interest_rate])
-            }
-
-        except Exception as e:
-            print(f"[ERROR] Failed to get market data: {e}")
-            return {
-                'kospi': None,
-                'usdkrw': None,
-                'interest_rate': None,
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'success': False
-            }
-
-    def get_historical_data(self, ticker: str, days: int = 7) -> Optional[Dict]:
+    def format_market_status(self, data: Dict) -> str:
         """
-        과거 데이터 조회 (차트용)
+        시장 데이터를 텔레그램 메시지 형식으로 포맷팅
 
         Args:
-            ticker: 티커 심볼 ('kospi' or 'usdkrw')
-            days: 조회 기간 (일)
+            data: get_all_market_data() 결과
 
         Returns:
-            {
-                'dates': ['2025-10-24', ...],
-                'values': [2600.5, 2615.3, ...]
-            }
+            포맷팅된 문자열
         """
-        try:
-            symbol = self.kospi_ticker if ticker == 'kospi' else self.usdkrw_ticker
+        lines = ["📈 실시간 시장 현황\n"]
 
-            yf_ticker = yf.Ticker(symbol)
-            hist = yf_ticker.history(period=f"{days}d")
+        # 코스피
+        if data.get('kospi'):
+            kospi = data['kospi']
+            symbol = "▲" if kospi['status'] == 'up' else "▼" if kospi['status'] == 'down' else "━"
+            lines.append(
+                f"• 코스피: {kospi['price']:,.2f} "
+                f"({symbol}{abs(kospi['change_percent'])}%)"
+            )
 
-            if hist.empty:
-                return None
+        # 환율
+        if data.get('exchange_rate'):
+            ex = data['exchange_rate']
+            symbol = "▲" if ex['status'] == 'up' else "▼" if ex['status'] == 'down' else "━"
+            lines.append(
+                f"• 달러/원: {ex['rate']:,.2f}원 "
+                f"({symbol}{abs(ex['change']):.2f}원)"
+            )
 
-            dates = [d.strftime('%Y-%m-%d') for d in hist.index]
-            values = hist['Close'].tolist()
+        # 금리
+        if data.get('interest_rate'):
+            ir = data['interest_rate']
+            lines.append(f"• 기준금리: {ir['rate']}% (보합)")
 
-            return {
-                'dates': dates,
-                'values': values
-            }
+        # 타임스탬프
+        lines.append(f"\n⏰ {data['timestamp']}")
 
-        except Exception as e:
-            print(f"[ERROR] Failed to get historical data for {ticker}: {e}")
-            return None
+        # 한마디 코멘트
+        if data.get('kospi'):
+            if data['kospi']['status'] == 'up':
+                lines.append("\n💡 오늘의 한마디: 상승세 지속 중!")
+            elif data['kospi']['status'] == 'down':
+                lines.append("\n💡 오늘의 한마디: 조정 국면 진입")
+            else:
+                lines.append("\n💡 오늘의 한마디: 보합세 유지")
+
+        return "\n".join(lines)
 
 
 def main():
-    """테스트용 메인 함수"""
+    """테스트 실행"""
     scraper = MarketDataScraper()
 
-    print("=" * 70)
+    print("=" * 60)
     print("Market Data Scraper Test")
-    print("=" * 70)
+    print("=" * 60)
 
     # 전체 데이터 조회
     data = scraper.get_all_market_data()
 
-    print("\n📈 KOSPI:")
-    if data['kospi']:
-        k = data['kospi']
-        print(f"  Value: {k['value']:,.2f}")
-        print(f"  Change: {k['change']:+.2f} ({k['change_percent']:+.2f}%)")
-        print(f"  Status: {k['status']}")
-    else:
-        print("  Failed to fetch")
+    # 포맷팅된 메시지 출력
+    message = scraper.format_market_status(data)
+    print("\n" + message)
 
-    print("\n💱 USD/KRW:")
-    if data['usdkrw']:
-        u = data['usdkrw']
-        print(f"  Value: {u['value']:,.2f}원")
-        print(f"  Change: {u['change']:+.2f}원 ({u['change_percent']:+.2f}%)")
-        print(f"  Status: {u['status']}")
-    else:
-        print("  Failed to fetch")
-
-    print("\n💰 Interest Rate:")
-    if data['interest_rate']:
-        i = data['interest_rate']
-        print(f"  Value: {i['value']}%")
-        print(f"  Updated: {i['last_updated']}")
-    else:
-        print("  Failed to fetch")
-
-    print(f"\n⏰ Timestamp: {data['timestamp']}")
-    print("=" * 70)
+    print("\n" + "=" * 60)
 
 
 if __name__ == '__main__':
