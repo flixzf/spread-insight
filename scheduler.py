@@ -23,6 +23,7 @@ from publishers.coupang_partners import CoupangPartners
 from publishers.telegram_publisher import TelegramPublisher
 from publishers.market_status_publisher import MarketStatusPublisher
 from publishers.market_chart_publisher import MarketChartPublisher
+from publishers.daily_tip_publisher import DailyTipPublisher
 
 
 class NewsScheduler:
@@ -33,6 +34,7 @@ class NewsScheduler:
         self.selector = AINewsSelector()
         self.gemini = GeminiAnalyzer()
         self.coupang = CoupangPartners()
+        self.daily_tip_publisher = DailyTipPublisher()
         # publisher는 매번 새로 생성 (연결 풀 문제 방지)
         self.kst = pytz.timezone('Asia/Seoul')
 
@@ -211,6 +213,48 @@ class NewsScheduler:
             import traceback
             traceback.print_exc()
 
+    async def send_economic_term(self):
+        """경제 용어 전송"""
+        try:
+            await self.daily_tip_publisher.send_economic_term()
+        except Exception as e:
+            print(f"[ERROR] Economic term job failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    async def send_investment_tip(self):
+        """투자 꿀팁 전송"""
+        try:
+            await self.daily_tip_publisher.send_investment_tip()
+        except Exception as e:
+            print(f"[ERROR] Investment tip job failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def run_economic_term_job(self):
+        """경제 용어 작업 실행 (동기 래퍼)"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.send_economic_term())
+            loop.close()
+        except Exception as e:
+            print(f"[ERROR] Economic term job execution failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def run_investment_tip_job(self):
+        """투자 꿀팁 작업 실행 (동기 래퍼)"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.send_investment_tip())
+            loop.close()
+        except Exception as e:
+            print(f"[ERROR] Investment tip job execution failed: {e}")
+            import traceback
+            traceback.print_exc()
+
     def start(self):
         """스케줄러 시작"""
         print(f"\n{'='*70}")
@@ -226,6 +270,9 @@ class NewsScheduler:
         print("\n📊 Market Chart Schedule:")
         print("  - 14:00 KST (05:00 UTC) - Morning market summary chart")
         print("  - 20:00 KST (11:00 UTC) - Daily closing chart")
+        print("\n💡 Daily Tips Schedule:")
+        print("  - 11:00 KST (02:00 UTC) - Economic term")
+        print("  - 16:00 KST (07:00 UTC) - Investment tip")
         print(f"{'='*70}\n")
 
         # UTC 시간으로 스케줄 등록 (Railway는 UTC 기준)
@@ -243,6 +290,10 @@ class NewsScheduler:
         # 시장 차트 스케줄
         schedule.every().day.at("05:00").do(self.run_market_chart_job)  # 14:00 KST
         schedule.every().day.at("11:00").do(self.run_market_chart_job)  # 20:00 KST
+
+        # 경제 꿀팁 스케줄 (Phase 2B)
+        schedule.every().day.at("02:00").do(self.run_economic_term_job)  # 11:00 KST - 경제 용어
+        schedule.every().day.at("07:00").do(self.run_investment_tip_job)  # 16:00 KST - 투자 꿀팁
 
         # 현재 시간 출력
         current_time = datetime.now(self.kst).strftime('%Y-%m-%d %H:%M:%S KST')
